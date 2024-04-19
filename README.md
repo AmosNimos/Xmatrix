@@ -61,6 +61,39 @@ Here's an example of how you can add the `flag` script to the system PATH using 
 5. You can now use the `flag` script from any directory in your terminal.
 
 ---
+To use `groff` to view the `xmatrix.1` man page, store it to a file, and compress it as `xmatrix.1.gz`, follow these steps:
+
+1. **Viewing the Man Page with `groff`**:
+   ```bash
+   groff -man -Tascii xmatrix.1 | less
+   ```
+   This command formats the `xmatrix.1` man page using `groff` and pipes it to `less` for paging.
+
+2. **Storing the Man Page to a File**:
+   ```bash
+   groff -man -Tascii xmatrix.1 > xmatrix_man.txt
+   ```
+   This command formats the `xmatrix.1` man page using `groff` and redirects the output to a file named `xmatrix_man.txt`.
+
+3. **Viewing the Man Page with `less`**:
+   ```bash
+   less xmatrix_man.txt
+   ```
+   This command uses `less` to view the contents of the `xmatrix_man.txt` file, which contains the formatted man page.
+
+4. **Compressing the Man Page as `.1.gz`**:
+   ```bash
+   gzip -c xmatrix.1 > xmatrix.1.gz
+   ```
+   This command compresses the `xmatrix.1` man page using `gzip` and saves it as `xmatrix.1.gz`.
+
+5. **Viewing the Compressed Man Page with `zless`**:
+   ```bash
+   zless xmatrix.1.gz
+   ```
+   This command uses `zless` to view the contents of the compressed `xmatrix.1.gz` man page.
+   For Linux distributions and other Unix-like systems, the man page is typically installed in a specific directory (e.g., /usr/share/man/man1/ for user commands) as a compressed file (e.g., xmatrix.1.gz).
+---
 
 ## License
 
