@@ -1,0 +1,315 @@
+#!/bin/bash
+################################################################################
+# Name:        xmatrix
+# Date:        2024-04-12
+# Author:      Amosnimos
+# Description: XMatrix is a Bash script that provides a simple CLI interface for interacting with Matrix servers, allowing users to send message trough the matrix protocol.
+################################################################################
+
+# ▌ ▌▙▗▌▞▀▖▀▛▘▛▀▖▜▘▌ ▌
+# ▝▞ ▌▘▌▙▄▌ ▌ ▙▄▘▐ ▝▞ 
+# ▞▝▖▌ ▌▌ ▌ ▌ ▌▚ ▐ ▞▝▖
+# ▘ ▘▘ ▘▘ ▘ ▘ ▘ ▘▀▘▘ ▘
+
+debug="flase"
+update_list="false"
+
+# Get exctract flags from arguments as variables using: https://github.com/AmosNimos/flag
+. flag
+flag "$@"
+
+print_help() {
+    echo "Usage: xmatrix [options]"
+    echo "Options:"
+    echo "  -h, --help       Display this help message"
+    echo "  -u, Update available rooms info"
+    echo "  -o, List available rooms"
+    echo "  -S, <url>        Set the Matrix server URL (default: https://matrix.org)"
+    echo "  -U, <username>   Set the Matrix username"
+    echo "  -P, <password>   Set the Matrix password"
+    echo "  -R, <room_id>    Set the room ID to send the message to"
+    echo "  -M, <message>    Set the message to send"
+    echo ""
+    echo "Description: XMatrix is a Bash script that provides a simple CLI interface for interacting with Matrix servers, allowing users to send and receive messages easily."
+}
+
+# Initializing global variables (we'll get this later)
+MATRIX_SERVER=""
+USERNAME=""
+PASSWORD=""
+ROOM_ID=""
+ACCESS_TOKEN=""
+MESSAGE=""
+
+# Temporary file to store room IDs and names
+USER_FILE="/var/tmp/.xmatrix_user.tmp"
+ROOM_FILE="/var/tmp/.xmatrix_rooms.tmp"
+LOG_FILE="/var/tmp/.xmatrix_log.tmp"
+
+# Matrix server URL
+if [[ -n $flag_S ]]; then
+    MATRIX_SERVER="$flag_S"
+else
+    MATRIX_SERVER="https://matrix.org"
+fi
+
+# Matrix username
+if [[ -n $flag_U ]]; then
+    USERNAME="$flag_U"
+fi
+
+# Matrix password
+if [[ -n $flag_P ]]; then
+    PASSWORD="$flag_P"
+fi
+
+# Room ID to send the message to
+if [[ -n $flag_R ]]; then
+    echo "$flag_R"
+    ROOM_ID="$flag_R"
+fi
+
+# Room ID to send the message to
+if [[ -n $flag_M ]]; then
+    MESSAGE="$flag_M"
+fi
+
+# List available rooms
+if [[ -n $flag_i ]]; then
+    echo "File location: $ROOM_FILE"
+    cat $ROOM_FILE
+    exit 0
+fi
+
+# Check if any argument is "--help" and display help message
+if [[ -n $flag_h || "${@,,}" == *"help" ]]; then
+  print_help
+  exit 0
+fi
+
+# Source the user password and username variables
+get_credential() {
+  if [ -f "$USER_FILE" ]; then
+    source "$USER_FILE"
+  else
+    echo "User file not found"
+  fi
+}
+
+# Get access token
+get_access_token() {
+    if [[ -z $ACCESS_TOKEN ]]; then 
+        local response
+        response=$(curl -s -XPOST -d '{"type":"m.login.password","user":"'"$USERNAME"'","password":"'"$PASSWORD"'"}' "$MATRIX_SERVER/_matrix/client/r0/login")
+        ACCESS_TOKEN=$(echo "$response" | jq -r '.access_token')
+        if [[ $ACCESS_TOKEN == "null" ]] || [[ -z $ACCESS_TOKEN ]]; then
+            return 1
+        else
+            return 0
+        fi
+    else
+        return 0
+    fi
+}
+
+# Send message to room
+send_message() {
+    #clear
+    local message="$@"
+    if [[ $debug == "true" ]]; then
+        echo "message: $message"
+        echo "access_token: $ACCESS_TOKEN"
+        echo "server: $MATRIX_SERVER"
+        echo "room: $ROOM_ID"
+    fi
+
+    #if curl -sS -XPOST -H "Authorization: Bearer $ACCESS_TOKEN" -d '{"msgtype":"m.text","body":"'"$message"'"}' "$MATRIX_SERVER/_matrix/client/r0/rooms/$ROOM_ID/send/m.room.message" ; then echo;echo "Message sent."; else echo;echo "Failed to send message."; fi 
+    curl -sS -XPOST -H "Authorization: Bearer $ACCESS_TOKEN" -d '{"msgtype":"m.text","body":"'"$message"'"}' "$MATRIX_SERVER/_matrix/client/r0/rooms/$ROOM_ID/send/m.room.message" > $LOG_FILE
+}
+
+# List rooms with non-null names and allow selection with fzf
+load_room_names() {
+  local room_file=$ROOM_FILE
+  declare -gA room_map
+
+  if [ -f "$room_file" ]; then
+    while IFS=$'\t' read -r id name; do
+      if [[ "$name" == "null" && -z "${room_map["$id"]}" ]]; then
+        read -rp "Enter a name for room $id: " new_name
+        room_map["$id"]="$new_name"
+        echo -e "$id\t$new_name" >> "$room_file"
+      else
+        room_map["$id"]="$name"
+      fi
+    done < "$room_file"
+  fi
+}
+
+add_room_name() {
+  local room_id=$@
+  local room_name=${room_map["$room_id"]}
+  if [[ ! -f $ROOM_FILE || ! $(grep -q "^$room_id" $ROOM_FILE) && "$room_name" == "null" ]]; then
+    read -rp "Enter a name for room $room_id: " new_name
+    room_map["$room_id"]="$new_name"
+    echo -e "$room_id $new_name" >> $ROOM_FILE
+  fi
+}
+
+display_rooms() {
+  echo "Available rooms:"
+  for room_id in "${!room_map[@]}"; do
+    echo "$room_id. ${room_map["$room_id"]}"
+  done
+}
+
+room_selection() {
+    local room_file="$ROOM_FILE"
+
+    if [[ ! -f "$room_file" ]] || [[ $update_list == "true" ]]; then
+        echo "Updating room list."
+        touch $room_file
+        update_list="true"
+    fi
+    
+    if [[ $update_list == "true" ]];then
+        room_ids=($(curl -s -H "Authorization: Bearer $ACCESS_TOKEN" "$MATRIX_SERVER/_matrix/client/r0/joined_rooms" | jq -r '.joined_rooms[]')) || { echo "Failed to list rooms."; return 1; }
+    else
+        declare -A room_ids=()  # initialize an empty array
+    fi
+    
+    declare -A room_map
+
+    if [[ -f "$room_file" ]]; then
+        # remove empty lines from the file
+        sed -i '/^$/d' $room_file
+        while read -r id name; do
+            if [[ -n "$id" && -n "$name" ]]; then
+                room_map["$id"]="$id $name"
+            fi
+        done < "$room_file"
+    fi
+
+    for room_id in "${room_ids[@]}"; do
+        if [[ -z "${room_map["$room_id"]}" ]]; then
+            if [[ $update_list == "true" ]]; then
+                local room_name=$(curl -s -H "Authorization: Bearer $ACCESS_TOKEN" "$MATRIX_SERVER/_matrix/client/r0/rooms/$room_id/state/m.room.name" | jq -r '.name')
+                if [[ "$room_name" == "null" ]]; then
+                    if grep -q "^$room_id" "$room_file"; then
+                        room_name=$(grep "^$room_id" "$room_file" | cut -d ' ' -f 2-)
+                    else
+                        read -rp "Enter a name for room $room_id: " new_name
+                        echo "$room_id $new_name" >> "$room_file"
+                        room_name="$new_name"
+                    fi
+                else
+                    echo "$room_id $room_name" >> "$room_file"
+                fi
+            else
+                # If update_list is false, set room_name to an empty string
+                room_name=""
+            fi
+
+            room_map["$room_id"]="$room_name"
+        fi
+    done
+
+    if [ ${#room_map[@]} -eq 0 ]; then
+        echo "No rooms found."
+        return 1
+    fi
+
+
+    if [[ $update_list == "false" ]]; then 
+        echo "Available rooms:"
+        idx=1
+        rooms=""
+        for room_id in "${!room_map[@]}"; do
+            first_element=$(echo "${room_map["$room_id"]}" | cut -d ' ' -f 1)
+            second_element=$(echo "${room_map["$room_id"]}" | cut -d' ' -f2-)
+            echo "$idx. $second_element"
+            rooms=$rooms"$first_element,"
+            ((idx++))
+        done
+
+        read -rp "Select a room by number: " selection
+        if [[ -z "$selection" || "$selection" -lt 1 || "$selection" -gt ${#room_map[@]} ]]; then
+            echo "Invalid selection."
+            return 1
+        fi
+
+        if [[ -z $ROOM_ID ]]; then        
+            ROOM_ID=$(echo "$rooms" | cut -d ',' -f $selection)
+        fi
+    fi
+}
+
+
+# Function to send a new message
+send_new_message() {
+    clear
+    if [[ -n $MESSAGE ]]; then
+        message=$MESSAGE
+    else
+        read -p "Message: " message
+    fi
+    send_message $message
+}
+
+# Get the last message in a room
+get_last_message() {
+  local room_id="$1"
+  local response
+  response=$(curl -s -H "Authorization: Bearer $ACCESS_TOKEN" "$MATRIX_SERVER/_matrix/client/r0/rooms/$room_id/messages?limit=1")
+  echo "$response" | jq '.chunk[0].content.body'
+}
+
+# Print room conversation
+print_room_conversation() {
+  local room_id=$ROOM_ID
+  local response
+  response=$(curl -s -H "Authorization: Bearer $ACCESS_TOKEN" "$MATRIX_SERVER/_matrix/client/r0/rooms/$room_id/messages?limit=10")
+  local messages=$(echo "$response" | jq -r '.chunk[].content.body')
+  for message in $messages; do
+    echo "$message"
+  done
+}
+
+get_credential
+
+# Verify credential
+while [[ -z "$USERNAME" ]]; do
+    clear
+    read -rp "Username: " USERNAME
+done
+while [[ -z "$PASSWORD" ]]; do
+    clear
+    read -rp "Password: " PASSWORD
+done
+clear
+
+get_access_token
+
+# Store credential
+if [[ $? -eq 0 ]]; then
+    #echo "Access token retrieved successfully."
+    echo "USERNAME=$USERNAME" > $USER_FILE
+    echo "PASSWORD=$PASSWORD" >> $USER_FILE
+    echo "ACCESS_TOKEN=$ACCESS_TOKEN" >> $USER_FILE
+else
+    echo "Failed to retrieve access token."
+    exit 0
+fi    
+
+if [[ -z $ROOM_ID ]]; then
+    room_selection    
+fi
+
+if [[ $update_list == "false" ]]; then
+    if [[ -n $ROOM_ID ]]; then
+        send_new_message
+    else
+        echo "ERROR: Room ID missing"
+    fi
+fi
+
+

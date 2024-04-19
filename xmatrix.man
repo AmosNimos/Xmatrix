@@ -1,0 +1,62 @@
+XMATRIX(1)                       User Commands                      XMATRIX(1)
+
+
+
+NNAAMMEE
+       xmatrix - a lightweight Matrix client for sending messages
+
+
+SSYYNNOOPPSSIISS
+       xxmmaattrriixx [_O_P_T_I_O_N]...
+
+
+DDEESSCCRRIIPPTTIIOONN
+       xxmmaattrriixx  is  a  command-line  Matrix client written in Bash that allows
+       users to send messages on Matrix servers quickly and efficiently. It is
+       designed to be minimalistic and focuses solely on sending messages.
+
+
+OOPPTTIIOONNSS
+       --hh,, ----hheellpp
+              Print the help.
+
+
+       --RR,, ----rroooomm _R_o_o_m___I_D
+              Set the room ID to send the message to.
+
+
+       --MM,, ----mmeessssaaggee _M_e_s_s_a_g_e
+              Set the message to send.
+
+
+       --SS,, ----sseerrvveerr _U_R_L
+              Set the Matrix server URL.
+
+
+       --UU,, ----uusseerrnnaammee _U_s_e_r_n_a_m_e
+              Set the Matrix username.
+
+
+       --PP,, ----ppaasssswwoorrdd _P_a_s_s_w_o_r_d
+              Set the Matrix password.
+
+
+EEXXAAMMPPLLEESS
+       Send a message to a room: xxmmaattrriixx --RR <<rroooomm__iidd>> --MM HHeelllloo,, wwoorrlldd!!
+
+       Set  custom server URL, username, and password: xxmmaattrriixx --SS <<sseerrvveerr__uurrll>>
+       --UU <<uusseerrnnaammee>> --PP <<ppaasssswwoorrdd>>
+
+
+AAUUTTHHOORR
+       Written by amosnimos.
+
+
+CCOOPPYYRRIIGGHHTT
+       Copyright  2024 amosnimos.  This is free software; see the  source  for
+       copying  conditions. There is NO warranty; not even for MERCHANTABILITY
+       or FITNESS FOR A PARTICULAR PURPOSE.
+
+
+
+xmatrix 1.0                       April 2024                        XMATRIX(1)
