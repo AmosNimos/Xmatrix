@@ -97,7 +97,7 @@ To use `groff` to view the `xmatrix.1` man page, store it to a file, and compres
 
 ## License
 
-This software is released under the MIT License. See the `LICENSE` file for more details.
+This software is released under the GNU LESSER GENERAL PUBLIC License. See the `LICENSE` file for more details.
 
 ## Author
 
